@@ -15,7 +15,7 @@ export default function ProblemsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeDiffs, setActiveDiffs] = useState<string[]>([]);
-  const [solvedProblems, setSolvedProblems] = useState<Set<string>>(new Set());
+  const [solvedProblems, setSolvedProblems] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchProblems = async () => {

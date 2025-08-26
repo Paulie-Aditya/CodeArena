@@ -13,7 +13,8 @@ export default function LogoutPage() {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       window.location.href = "/";
-    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
       alert("Sign-out failed. Try again.");
     } finally {
       setLoading(false);

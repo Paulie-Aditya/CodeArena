@@ -65,7 +65,32 @@ export default function SubmissionsPage() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setSubmissions(data || []);
+
+      // Transform the data to match the expected type
+      const transformedData = (data || []).map(
+        (submission: Record<string, unknown>) => ({
+          id: submission.id as string,
+          created_at: submission.created_at as string,
+          language: submission.language as string,
+          code: submission.code as string,
+          verdict: submission.verdict as string,
+          runtime: submission.runtime as number | null,
+          memory: submission.memory as number | null,
+          problem: Array.isArray(submission.problem)
+            ? (submission.problem[0] as {
+                title: string;
+                slug: string;
+                difficulty: string;
+              })
+            : (submission.problem as {
+                title: string;
+                slug: string;
+                difficulty: string;
+              }),
+        })
+      );
+
+      setSubmissions(transformedData);
     } catch (error) {
       console.error("Error fetching submissions:", error);
     } finally {

@@ -129,7 +129,8 @@ export function CodeEditor({
           }
         }
       }
-    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
       toast.error("Run failed");
       setResult({ status: { id: 0, description: "Failed" } });
     } finally {

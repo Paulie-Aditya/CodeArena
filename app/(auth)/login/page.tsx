@@ -18,9 +18,14 @@ export default function LoginPage() {
             typeof window !== "undefined" ? window.location.origin : undefined,
         },
       });
-      if (error) throw error;
+      if (error) {
+        console.error(`${provider} sign-in error:`, error);
+        alert(`${provider} sign-in failed: ${error.message}`);
+        throw error;
+      }
     } catch (e) {
-      alert("Sign-in failed. Try again.");
+      console.error(`${provider} sign-in exception:`, e);
+      alert(`${provider} sign-in failed. Check console for details.`);
     } finally {
       setLoading(null);
     }
