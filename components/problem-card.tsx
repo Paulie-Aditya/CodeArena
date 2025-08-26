@@ -23,13 +23,29 @@ export type Problem = {
   tags: string[];
 };
 
-export function ProblemCard({ problem }: { problem: Problem }) {
+export function ProblemCard({
+  problem,
+  isSolved = false,
+}: {
+  problem: Problem;
+  isSolved?: boolean;
+}) {
   return (
     <Link href={`/problems/${problem.slug}`}>
       <Card className="hover-card">
         <CardHeader className="pb-0">
           <CardTitle className="text-base flex items-center justify-between">
-            <span>{problem.title}</span>
+            <div className="flex items-center gap-2">
+              <span>{problem.title}</span>
+              {isSolved && (
+                <Badge
+                  variant="default"
+                  className="bg-green-500 text-white text-xs"
+                >
+                  ✓ Solved
+                </Badge>
+              )}
+            </div>
             <span
               className={`px-2 py-0.5 rounded-md text-xs ${diffClass(
                 problem.difficulty

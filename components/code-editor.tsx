@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Editor from "@monaco-editor/react";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Maximize2, Minimize2, RotateCcw, Play } from "lucide-react";
 import { languageToJudge0, submitToJudge0 } from "@/lib/judge0";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+
+const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 const LANGS = [
   { id: "javascript", label: "JavaScript" },
@@ -15,13 +19,15 @@ const LANGS = [
 
 const TEMPLATES: Record<string, string> = {
   javascript: `// JavaScript template\nfunction solve() {\n  // TODO\n}\n`,
-  python: `# Python template\ndef solve():\n    pass\n \n \nif __name__ == "__main__":\n    solve()`,
+  python: `# Python template\ndef solve():\n    pass\n`,
   java: `// Java template\npublic class Main {\n  public static void main(String[] args) {\n  }\n}\n`,
   cpp: `// C++ template\n#include <bits/stdc++.h>\nusing namespace std;\nint main(){\n  return 0;\n}\n`,
 };
 
 type Props = {
   problemSlug: string;
+  problemId?: number;
+  difficulty?: "Easy" | "Medium" | "Hard";
   initialLanguage?: (typeof LANGS)[number]["id"];
   testCases?: Array<{ input: string; output: string }>;
 };
@@ -37,6 +43,8 @@ type Judge0Response = {
 
 export function CodeEditor({
   problemSlug,
+  problemId,
+  difficulty,
   initialLanguage = "javascript",
   testCases = [],
 }: Props) {
@@ -47,6 +55,7 @@ export function CodeEditor({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Judge0Response | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [isEditorLoading, setIsEditorLoading] = useState(true);
 
   const key = useMemo(() => `code:${problemSlug}:${lang}`, [problemSlug, lang]);
 
@@ -59,7 +68,10 @@ export function CodeEditor({
     localStorage.setItem(key, code);
   }, [key, code]);
 
-  const reset = useCallback(() => setCode(TEMPLATES[lang]), [lang]);
+  const reset = useCallback(() => {
+    setCode(TEMPLATES[lang]);
+    toast("Editor reset to template");
+  }, [lang]);
 
   const run = useCallback(async () => {
     try {
@@ -75,12 +87,55 @@ export function CodeEditor({
       };
       const data = (await submitToJudge0(payload)) as Judge0Response;
       setResult(data);
+      toast.success(data.status?.description || "Executed");
+
+      // Save submission
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (uid && problemId) {
+        const verdict = data.status?.description ?? "Unknown";
+        const runtimeMs = data.time
+          ? Math.round(parseFloat(data.time) * 1000)
+          : null;
+        const memoryKb = data.memory ?? null;
+        await supabase.from("submissions").insert({
+          user_id: uid,
+          problem_id: problemId,
+          language: lang,
+          code,
+          verdict,
+          runtime: runtimeMs,
+          memory: memoryKb,
+        });
+
+        // Update profile counts on Accepted
+        if (verdict.toLowerCase().includes("accepted")) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("solved_count,easy_solved,medium_solved,hard_solved")
+            .eq("id", uid)
+            .single();
+          if (profile) {
+            const updates: Record<string, number> = {
+              solved_count: (profile.solved_count ?? 0) + 1,
+            };
+            if (difficulty === "Easy")
+              updates.easy_solved = (profile.easy_solved ?? 0) + 1;
+            if (difficulty === "Medium")
+              updates.medium_solved = (profile.medium_solved ?? 0) + 1;
+            if (difficulty === "Hard")
+              updates.hard_solved = (profile.hard_solved ?? 0) + 1;
+            await supabase.from("profiles").update(updates).eq("id", uid);
+          }
+        }
+      }
     } catch (e) {
+      toast.error("Run failed");
       setResult({ status: { id: 0, description: "Failed" } });
     } finally {
       setLoading(false);
     }
-  }, [lang, code, testCases]);
+  }, [lang, code, testCases, problemId, difficulty]);
 
   const verdict = result?.status?.description ?? "—";
 
@@ -126,20 +181,32 @@ export function CodeEditor({
           </Button>
         </div>
       </div>
-      <div className="mt-3 rounded-md overflow-hidden border-[hsl(var(--border))]">
-        <Editor
-          height={full ? "80vh" : "50vh"}
-          language={lang === "cpp" ? "cpp" : lang}
-          theme="vs-dark"
-          value={code}
-          onChange={(v) => setCode(v ?? "")}
-          options={{
-            minimap: { enabled: false },
-            wordWrap: "on",
-            automaticLayout: true,
-            fontSize: 14,
-          }}
-        />
+      <div className="mt-3 rounded-md overflow-hidden border-[hsl(var(--border))] relative">
+        {isEditorLoading && (
+          <div className="absolute inset-0 bg-muted animate-pulse rounded flex items-center justify-center z-10">
+            <div className="text-muted-foreground">Loading editor...</div>
+          </div>
+        )}
+        <Suspense
+          fallback={
+            <div className="h-[50vh] w-full animate-pulse bg-[hsl(var(--muted))]" />
+          }
+        >
+          <Editor
+            height={full ? "80vh" : "50vh"}
+            language={lang === "cpp" ? "cpp" : lang}
+            theme="vs-dark"
+            value={code}
+            onChange={(v) => setCode(v ?? "")}
+            options={{
+              minimap: { enabled: false },
+              wordWrap: "on",
+              automaticLayout: true,
+              fontSize: 14,
+            }}
+            onMount={() => setIsEditorLoading(false)}
+          />
+        </Suspense>
       </div>
       <div className="mt-3 rounded-md border-[hsl(var(--border))] p-3">
         <div className="flex items-center justify-between">

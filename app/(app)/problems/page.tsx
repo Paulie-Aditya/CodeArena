@@ -15,6 +15,7 @@ export default function ProblemsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeDiffs, setActiveDiffs] = useState<string[]>([]);
+  const [solvedProblems, setSolvedProblems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchProblems = async () => {
@@ -24,6 +25,25 @@ export default function ProblemsPage() {
       setLoading(false);
     };
     fetchProblems();
+  }, []);
+
+  useEffect(() => {
+    const fetchSolvedProblems = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      const { data, error } = await supabase
+        .from("submissions")
+        .select("problem_id, verdict")
+        .eq("user_id", userData.user.id)
+        .eq("verdict", "Accepted");
+
+      if (!error && data) {
+        const solvedIds = new Set(data.map((s) => s.problem_id));
+        setSolvedProblems(solvedIds);
+      }
+    };
+    fetchSolvedProblems();
   }, []);
 
   const filtered = useMemo(() => {
@@ -82,7 +102,11 @@ export default function ProblemsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((p) => (
-            <ProblemCard key={p.id} problem={p} />
+            <ProblemCard
+              key={p.id}
+              problem={p}
+              isSolved={solvedProblems.has(p.id)}
+            />
           ))}
           {filtered.length === 0 && (
             <div className="text-sm text-muted-foreground">

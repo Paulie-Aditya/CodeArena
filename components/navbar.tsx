@@ -36,6 +36,12 @@ export function Navbar() {
               Problems
             </Link>
             <Link
+              href="/submissions"
+              className="hover:text-foreground px-3 py-1.5 rounded-md hover:bg-foreground/5"
+            >
+              Submissions
+            </Link>
+            <Link
               href="/leaderboard"
               className="hover:text-foreground px-3 py-1.5 rounded-md hover:bg-foreground/5"
             >
